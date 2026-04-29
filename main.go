@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,12 +13,26 @@ func main() {
 	})
 
 	http.HandleFunc("/ai-query", func(w http.ResponseWriter, r *http.Request) {
-		input := r.URL.Query().Get("input")
-		if input == "" {
-			http.Error(w, "Missing 'input' query paramter", http.StatusBadRequest)
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 			return
 		}
-		altered := strings.ToUpper(input)
+
+		var body struct {
+			Input string `json:"input"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+
+		if body.Input == "" {
+			http.Error(w, "Missing input", http.StatusBadRequest)
+			return
+		}
+
+		altered := strings.ToUpper(body.Input)
 		fmt.Fprintf(w, altered)
 	})
 
