@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+
+	"github.com/anthropics/anthropic-sdk-go"
 )
 
 func main() {
@@ -32,8 +34,25 @@ func main() {
 			return
 		}
 
-		altered := strings.ToUpper(body.Input)
-		fmt.Fprintf(w, altered)
+		// AI
+
+		client := anthropic.NewClient()
+
+		message, err := client.Messages.New(context.TODO(),	anthropic.MessageNewParams{
+				Model: anthropic.ModelClaudeHaiku4_5,
+				MaxTokens: 100,
+				Messages: []anthropic.MessageParam{
+					anthropic.NewUserMessage(
+						anthropic.NewTextBlock(body.Input),
+					),
+				},
+		})
+
+		if err != nil {
+			http.Error(w, "AI request failed", http.StatusInternalServerError)
+		}
+		
+		fmt.Fprintf(w, message.Content[0].Text)
 	})
 
 	fmt.Println("Server starting on :8080...")
