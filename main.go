@@ -36,14 +36,16 @@ func main() {
 
 		// AI
 
-		client := anthropic.NewClient()
+		client := anthropic.NewClient() // sdk picks up ANTHROPIC_API_KEY variable automatically from env
+
+		prompt := "Convert the following phrase into 5 to 8 words that capture it's rhythm, tempo and energy. Only the adjectives, your response should literally be 5, space-seperated words on one line:"
 
 		message, err := client.Messages.New(context.TODO(),	anthropic.MessageNewParams{
 				Model: anthropic.ModelClaudeHaiku4_5,
 				MaxTokens: 100,
 				Messages: []anthropic.MessageParam{
 					anthropic.NewUserMessage(
-						anthropic.NewTextBlock(body.Input),
+						anthropic.NewTextBlock(prompt + " " + body.Input),
 					),
 				},
 		})
