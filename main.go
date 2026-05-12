@@ -38,8 +38,6 @@ func main() {
 			return
 		}
 
-		fmt.Println("ACTION")
-
 		var body struct {
 			Input string `json:"input"`
 		}
@@ -75,7 +73,9 @@ func main() {
 			return
 		}
 		
-		fmt.Fprintf(w, message.Content[0].Text)
+		// fmt.Fprintf(w, message.Content[0].Text)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"result": message.Content[0].Text})
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
