@@ -5,14 +5,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	godotenv.Load()
+
+	origin := os.Getenv("ALLOWED_ORIGIN")
+	if origin == "" {
+		origin = "*"
+	}
+
 	corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
       w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			if r.Method == http.MethodOptions {
@@ -23,11 +32,7 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello, you!")
-	})
-
-	http.HandleFunc("/ai-query", func(w http.ResponseWriter, r *http.Request) {
+	aiQueryHandler := func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 			return
@@ -67,10 +72,17 @@ func main() {
 
 		if err != nil {
 			http.Error(w, "AI request failed", http.StatusInternalServerError)
+			return
 		}
 		
 		fmt.Fprintf(w, message.Content[0].Text)
+	}
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello, you!")
 	})
+
+	http.HandleFunc("/ai-query", corsMiddleware(aiQueryHandler))
 
 	fmt.Println("Server starting on :8080...")
 

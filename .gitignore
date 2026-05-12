@@ -1,0 +1,7 @@
+.env
+*.env
+
+#go build ouput
+/sound-palette-api
+
+.DS_Store
