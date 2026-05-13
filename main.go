@@ -56,7 +56,7 @@ func main() {
 
 		client := anthropic.NewClient() // sdk picks up ANTHROPIC_API_KEY variable automatically from env
 
-		prompt := "Convert the following phrase into 5 to 8 words that capture it's rhythm, tempo and energy. Only the adjectives, your response should literally be 5, space-seperated words on one line:"
+		prompt := "Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Return an Array with an object for each of the five words in the following format: { adjective: [the word], colour: [hex colour corresponding to the word] }.  So an array of 5 Objects. "
 
 		message, err := client.Messages.New(context.TODO(),	anthropic.MessageNewParams{
 				Model: anthropic.ModelClaudeHaiku4_5,
@@ -74,8 +74,15 @@ func main() {
 		}
 		
 		// fmt.Fprintf(w, message.Content[0].Text)
+		// json.NewEncoder(w).Encode(map[string]string{"result": message.Content[0].Text})
+		var parsed []interface{}
+		if err := json.Unmarshal([]byte(message.Content[0].Text), &parsed); err != nil {
+			http.Error(w, "failed to parseAI response", http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"result": message.Content[0].Text})
+		json.NewEncoder(w).Encode(parsed)
+		
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
