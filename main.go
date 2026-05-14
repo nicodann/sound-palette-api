@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/joho/godotenv"
@@ -52,15 +53,27 @@ func main() {
 			return
 		}
 
+		// MOCK
+
+		if os.Getenv("MOCK_AI") == "true" {
+			mock := `[{"adjective":"dreamy","colour":"#A8D8EA"},{"adjective":"soft","colour":"#AA96DA"},{"adjective":"calm","colour":"#FCBAD3"},{"adjective":"gentle","colour":"#FFFFD2"},{"adjective":"slow","colour":"#B5EAD7"}]`
+			var parsed []interface{}
+			json.Unmarshal([]byte(mock), &parsed)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(parsed)
+			fmt.Println("Sending mock data")
+			return
+	}
+
 		// AI
 
 		client := anthropic.NewClient() // sdk picks up ANTHROPIC_API_KEY variable automatically from env
 
-		prompt := "Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Return an Array with an object for each of the five words in the following format: { adjective: [the word], colour: [hex colour corresponding to the word] }.  So an array of 5 Objects. "
+		prompt := `Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Also one colour, in hexcode format, that corresponds to each word. Return ONLY a valid JSON Array, no other text, no markdown. format: [{"adjective": "word", "colour": "#hexcode"}].`
 
 		message, err := client.Messages.New(context.TODO(),	anthropic.MessageNewParams{
 				Model: anthropic.ModelClaudeHaiku4_5,
-				MaxTokens: 100,
+				MaxTokens: 300,
 				Messages: []anthropic.MessageParam{
 					anthropic.NewUserMessage(
 						anthropic.NewTextBlock(prompt + " " + body.Input),
@@ -69,14 +82,25 @@ func main() {
 		})
 
 		if err != nil {
+			fmt.Println("AI request failed:", err)
 			http.Error(w, "AI request failed", http.StatusInternalServerError)
 			return
 		}
 		
+		fmt.Println("Claude raw response:", message.Content[0].Text)
+		// RETURN JUST NewTextBlock
 		// fmt.Fprintf(w, message.Content[0].Text)
 		// json.NewEncoder(w).Encode(map[string]string{"result": message.Content[0].Text})
+		text := message.Content[0].Text
+		text = strings.TrimSpace(text)
+		text = strings.TrimPrefix(text, "```json")
+		text = strings.TrimPrefix(text, "```")
+		text = strings.TrimSuffix(text, "```")
+		text = strings.TrimSpace(text)
+
 		var parsed []interface{}
-		if err := json.Unmarshal([]byte(message.Content[0].Text), &parsed); err != nil {
+		if err := json.Unmarshal([]byte(text), &parsed); err != nil {
+			fmt.Println("JSON parse failed:", err)
 			http.Error(w, "failed to parseAI response", http.StatusInternalServerError)
 			return
 		}
