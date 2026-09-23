@@ -69,7 +69,7 @@ func main() {
 
 		client := anthropic.NewClient() // sdk picks up ANTHROPIC_API_KEY variable automatically from env
 
-		prompt := `Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Also one colour, in hexcode format, that corresponds to each word. Return ONLY a valid JSON Array, no other text, no markdown. format: [{"adjective": "word", "colour": "#hexcode"}].`
+		prompt := `Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Also one colour, in hexcode format, that corresponds to each word. Return ONLY a valid JSON Array, no other text, no markdown. format: [{"adjective": "word", "colour": "#hexcode"}]. For the colours avoid bold primaries unless explicity stated by the user.`
 
 		message, err := client.Messages.New(context.TODO(),	anthropic.MessageNewParams{
 				Model: anthropic.ModelClaudeHaiku4_5,
