@@ -9,11 +9,32 @@ import (
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	godotenv.Load()
+
+	// PGX
+
+	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer conn.Close(context.Background())
+
+	var email string
+	err = conn.QueryRow(context.Background(), "select email from users where id=$1", 42).Scan(&email)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "QueryRow failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(email)
+
+	// END PGX
 
 	origin := os.Getenv("ALLOWED_ORIGIN")
 	if origin == "" {
