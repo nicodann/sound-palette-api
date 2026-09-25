@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -93,6 +94,8 @@ func main() {
 		var id string
 		err = conn.QueryRow(context.Background(), "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", body.Email, hashedPassowrd).Scan(&id)
 
+		fmt.Println("INSERT error:", err)
+
 		if err != nil {
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
 			return
@@ -114,6 +117,62 @@ func main() {
 			return
 		}
 	
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"token":ss})
+	}
+
+	loginHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var body struct {
+			Email string `json:"email"`
+			Password string `json:"password"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+
+		if body.Email == "" || body.Password == "" {
+			http.Error(w, "Missing input", http.StatusBadRequest)
+			return
+		}
+
+		var id string
+		var passwordDb string
+		err = conn.QueryRow(context.Background(), "select id, password from users where email=$1", body.Email).Scan(&id, &passwordDb)
+		if err != nil {
+			http.Error(w, "Email not found", http.StatusConflict)
+			return
+		}
+
+		err = bcrypt.CompareHashAndPassword( []byte(passwordDb), []byte(body.Password))
+
+		if err != nil {
+			http.Error(w, "Password is incorrect", http.StatusInternalServerError)
+			return
+		}
+
+		claims := Claims{
+			UserID: id,
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			},
+
+		}
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		ss, err := token.SignedString([]byte(jwtSecret))
+
+		if err != nil {
+			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"token":ss})
@@ -200,7 +259,10 @@ func main() {
 
 	http.HandleFunc("/auth/register", corsMiddleware(registerHandler))
 
+	http.HandleFunc("/auth/login", corsMiddleware(loginHandler))
+
 	fmt.Println("Server starting on :8080...")
 
 	http.ListenAndServe(":8080", nil)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
