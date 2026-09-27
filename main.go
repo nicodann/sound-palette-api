@@ -7,16 +7,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 )
-
-type Claims struct {
-    UserID string `json:"user_id"`
-    jwt.RegisteredClaims
-}
-
 
 func main() {
 	godotenv.Load()
@@ -41,7 +34,7 @@ func main() {
 	corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
       w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
@@ -61,8 +54,11 @@ func main() {
 
 	http.HandleFunc("/auth/login", corsMiddleware(loginHandler(conn, jwtSecret)))
 
+	http.HandleFunc("/palettes/save", corsMiddleware(savePaletteHandler(conn, jwtSecret)))
+
+	http.HandleFunc("/palettes/get", corsMiddleware(getPalettesHandler(conn, jwtSecret)))
+
 	fmt.Println("Server starting on :8080...")
 
-	http.ListenAndServe(":8080", nil)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
