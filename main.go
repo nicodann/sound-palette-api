@@ -34,7 +34,7 @@ func main() {
 	corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, DELETE, OPTIONS")
       w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
@@ -54,9 +54,11 @@ func main() {
 
 	http.HandleFunc("/auth/login", corsMiddleware(loginHandler(conn, jwtSecret)))
 
-	http.HandleFunc("/palettes/save", corsMiddleware(savePaletteHandler(conn, jwtSecret)))
+	http.HandleFunc("/palettes", corsMiddleware(palettesHandler(conn, jwtSecret)))
 
-	http.HandleFunc("/palettes/get", corsMiddleware(getPalettesHandler(conn, jwtSecret)))
+	// http.HandleFunc("/palettes", corsMiddleware(getPalettesHandler(conn, jwtSecret)))
+
+	http.HandleFunc("/palettes/", corsMiddleware(deletePaletteHandler(conn, jwtSecret)))
 
 	fmt.Println("Server starting on :8080...")
 

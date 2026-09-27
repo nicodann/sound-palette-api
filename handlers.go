@@ -217,20 +217,83 @@ func aiQueryHandler() http.HandlerFunc {
 	}
 }
 
-func savePaletteHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		if r.Method == http.MethodPost {
+			var body struct {
+				Name	string	`json:"name"`
+				Palette []interface{} `json:"palette"`
+			}
+
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "invalid JSON body", http.StatusBadRequest)
+				return
+			}
+
+			userId, err := extractUserID(r, jwtSecret)
+
+			if err != nil {
+				http.Error(w, "error parsing user ID", http.StatusUnauthorized)
+				return
+			}
+
+			_, err = conn.Exec(context.Background(), "INSERT INTO palettes (user_id, name, palette) VALUES ($1, $2, $3)", userId, body.Name, body.Palette)
+
+			if err != nil {
+				http.Error(w, "failed to save palette", http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusCreated)
+		} else if r.Method == http.MethodGet {
+			userId, err := extractUserID(r, jwtSecret)
+
+			if err != nil {
+				http.Error(w, "error parsing user ID", http.StatusUnauthorized)
+				return
+			}
+
+			rows, err := conn.Query(context.Background(), "SELECT id, name, palette, created_at FROM palettes WHERE user_id = $1", userId)
+
+			if err != nil {
+				http.Error(w, "failed to fetch palettes", http.StatusInternalServerError)
+				return
+			}
+
+			defer rows.Close()
+
+			type Palette struct {
+				ID string `json:"id"`
+				Name string `json:"name"`
+				Palette []interface{} `json:"palette"`
+				CreatedAt time.Time `json:"created_at"`
+			}
+
+			var palettes []Palette
+
+			for rows.Next() {
+				var p Palette
+				err := rows.Scan(&p.ID, &p.Name, &p.Palette, &p.CreatedAt)
+				if err != nil {
+					http.Error(w, "failes to scan palette", http.StatusInternalServerError)
+					return
+				}
+				palettes = append(palettes, p)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(palettes)
+		} else {
+			http.Error(w, "GET or POST required", http.StatusMethodNotAllowed)
 			return
 		}
+	}
+}
 
-		var body struct {
-			Name	string	`json:"name"`
-			Palette []interface{} `json:"palette"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+func deletePaletteHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r * http.Request) {
+		if r.Method != http.MethodDelete {
+		http.Error(w, "DELETE required", http.StatusMethodNotAllowed)
 		return
 		}
 
@@ -241,60 +304,17 @@ func savePaletteHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
-		_, err = conn.Exec(context.Background(), "INSERT INTO palettes (user_id, name, palette) VALUES ($1, $2, $3)", userId, body.Name, body.Palette)
+		id := strings.TrimPrefix(r.URL.Path, "/palettes/")
+
+		_, err = conn.Exec(context.Background(), "DELETE FROM palettes WHERE user_id = $1 AND id = $2", userId, id)
 
 		if err != nil {
-			http.Error(w, "failed to save palette", http.StatusInternalServerError)
+			http.Error(w, "failed to delete palette", http.StatusInternalServerError)
 			return
 		}
 
-		w.WriteHeader(http.StatusCreated)
-	}
-}
+		w.WriteHeader(http.StatusOK)
 
-func getPalettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "GET required", http.StatusMethodNotAllowed)
-			return
-		}
 
-			userId, err := extractUserID(r, jwtSecret)
-
-		if err != nil {
-			http.Error(w, "error parsing user ID", http.StatusUnauthorized)
-			return
-		}
-
-		rows, err := conn.Query(context.Background(), "SELECT id, name, palette, created_at FROM palettes WHERE user_id = $1", userId)
-
-		if err != nil {
-			http.Error(w, "failed to fetch palettes", http.StatusInternalServerError)
-			return
-		}
-
-		defer rows.Close()
-
-		type Palette struct {
-			ID string `json:"id"`
-			Name string `json:"name"`
-			Palette []interface{} `json:"palette"`
-			CreatedAt time.Time `json:"created_at"`
-		}
-
-		var palettes []Palette
-
-		for rows.Next() {
-			var p Palette
-			err := rows.Scan(&p.ID, &p.Name, &p.Palette, &p.CreatedAt)
-			if err != nil {
-				http.Error(w, "failes to scan palette", http.StatusInternalServerError)
-				return
-			}
-			palettes = append(palettes, p)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(palettes)
 	}
 }
