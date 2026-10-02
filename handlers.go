@@ -154,6 +154,33 @@ func loginHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 
 }
 
+func meHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			userId, err := extractUserID(r, jwtSecret)
+
+			if err != nil {
+				http.Error(w, "error parsing user ID", http.StatusUnauthorized)
+				return
+			}
+
+			var email string
+			err = conn.QueryRow(context.Background(), "SELECT email FROM users WHERE id = $1", userId).Scan(&email)
+
+			if err != nil {
+				http.Error(w, "failed to Authenicate", http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"id": userId, "email": email})
+
+		} else {
+			http.Error(w, "GET required", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
 func aiQueryHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -303,6 +330,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 }
 
 func deletePaletteHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r * http.Request) {
 		if r.Method != http.MethodDelete {
 		http.Error(w, "DELETE required", http.StatusMethodNotAllowed)
