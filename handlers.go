@@ -78,7 +78,13 @@ func registerHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"token":ss})
+		http.SetCookie(w, &http.Cookie{
+			Name: "token",
+			Value: ss,
+			HttpOnly: true,
+			Path: "/",
+		})
+		// json.NewEncoder(w).Encode(map[string]string{"token":ss})
 	}
 
 } 
@@ -137,7 +143,13 @@ func loginHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 		}
 	
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"token":ss})
+		// json.NewEncoder(w).Encode(map[string]string{"token":ss})
+		http.SetCookie(w, &http.Cookie{
+			Name: "token",
+			Value: ss,
+			HttpOnly: true,
+			Path: "/",
+		})
 	}
 
 }

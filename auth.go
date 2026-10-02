@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -14,8 +13,11 @@ type Claims struct {
 }
 
 func extractUserID(r *http.Request, secret string) (string, error) {
-	authHeader := r.Header.Get("Authorization")
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		return "", err
+	}
+	tokenString := cookie.Value
 
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
