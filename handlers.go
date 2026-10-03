@@ -78,13 +78,16 @@ func registerHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 
 
 		w.Header().Set("Content-Type", "application/json")
+
 		http.SetCookie(w, &http.Cookie{
 			Name: "token",
 			Value: ss,
 			HttpOnly: true,
 			Path: "/",
 		})
-		// json.NewEncoder(w).Encode(map[string]string{"token":ss})
+
+		json.NewEncoder(w).Encode(map[string]string{"id": id, "email": body.Email})
+		
 	}
 
 } 
@@ -141,7 +144,7 @@ func loginHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
 		}
-	
+
 		w.Header().Set("Content-Type", "application/json")
 		
 		http.SetCookie(w, &http.Cookie{
@@ -150,8 +153,9 @@ func loginHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 			HttpOnly: true,
 			Path: "/",
 		})
-	}
 
+		json.NewEncoder(w).Encode(map[string]string{"id": id, "email": body.Email})		
+	}
 }
 
 func meHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
