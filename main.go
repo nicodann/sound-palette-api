@@ -56,6 +56,8 @@ func main() {
 
 	http.HandleFunc("/auth/me", corsMiddleware(meHandler(conn, jwtSecret)))
 
+	http.HandleFunc("/auth/logout", corsMiddleware(logoutHandler()))
+
 	http.HandleFunc("/palettes", corsMiddleware(palettesHandler(conn, jwtSecret)))
 
 	// http.HandleFunc("/palettes", corsMiddleware(getPalettesHandler(conn, jwtSecret)))

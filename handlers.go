@@ -143,7 +143,7 @@ func loginHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 		}
 	
 		w.Header().Set("Content-Type", "application/json")
-		// json.NewEncoder(w).Encode(map[string]string{"token":ss})
+		
 		http.SetCookie(w, &http.Cookie{
 			Name: "token",
 			Value: ss,
@@ -177,6 +177,26 @@ func meHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 
 		} else {
 			http.Error(w, "GET required", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+func logoutHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+		
+		http.SetCookie(w, &http.Cookie{
+			Name: "token",
+			Value: "",
+			HttpOnly: true,
+			Path: "/",
+			Expires: time.Unix(0, 0),
+		})
+
+		w.WriteHeader(http.StatusOK)
+
+		} else {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		}
 	}
 }
