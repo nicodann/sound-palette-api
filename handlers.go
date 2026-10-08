@@ -291,6 +291,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 			var body struct {
 				Name	string	`json:"name"`
 				Palette []interface{} `json:"palette"`
+				Prompt string `json:"prompt"`
 			}
 
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -305,7 +306,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 				return
 			}
 
-			_, err = conn.Exec(context.Background(), "INSERT INTO palettes (user_id, name, palette) VALUES ($1, $2, $3)", userId, body.Name, body.Palette)
+			_, err = conn.Exec(context.Background(), "INSERT INTO palettes (user_id, name, prompt, palette) VALUES ($1, $2, $3, $4)", userId, body.Name, body.Prompt, body.Palette)
 
 			if err != nil {
 				http.Error(w, "failed to save palette", http.StatusInternalServerError)
@@ -321,7 +322,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 				return
 			}
 
-			rows, err := conn.Query(context.Background(), "SELECT id, name, palette, created_at FROM palettes WHERE user_id = $1", userId)
+			rows, err := conn.Query(context.Background(), "SELECT id, name, prompt, palette, created_at FROM palettes WHERE user_id = $1", userId)
 
 			if err != nil {
 				http.Error(w, "failed to fetch palettes", http.StatusInternalServerError)
@@ -333,6 +334,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 			type Palette struct {
 				ID string `json:"id"`
 				Name string `json:"name"`
+				Prompt string `json:"prompt"`
 				Palette []interface{} `json:"palette"`
 				CreatedAt time.Time `json:"created_at"`
 			}
@@ -341,7 +343,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 
 			for rows.Next() {
 				var p Palette
-				err := rows.Scan(&p.ID, &p.Name, &p.Palette, &p.CreatedAt)
+				err := rows.Scan(&p.ID, &p.Name, &p.Prompt, &p.Palette, &p.CreatedAt)
 				if err != nil {
 					http.Error(w, "failes to scan palette", http.StatusInternalServerError)
 					return
