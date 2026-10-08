@@ -204,7 +204,7 @@ func logoutHandler() http.HandlerFunc {
 			Expires: time.Unix(0, 0),
 		})
 
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNoContent)
 
 		} else {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
