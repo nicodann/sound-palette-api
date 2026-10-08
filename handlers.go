@@ -38,6 +38,11 @@ func registerHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
+		if len(body.Password) < 8 {
+			http.Error(w, "Password must be at least 8 characters", http.StatusBadRequest)
+			return
+		}
+
 		var email string
 		err := conn.QueryRow(context.Background(), "select email from users where email=$1", body.Email).Scan(&email)
 		if err == nil {
