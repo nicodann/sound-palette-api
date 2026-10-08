@@ -44,7 +44,8 @@ func registerHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 		}
 
 		var email string
-		err := conn.QueryRow(context.Background(), "select email from users where email=$1", body.Email).Scan(&email)
+		err := conn.QueryRow(context.Background(), "SELECT email FROM users WHERE email=$1", body.Email).Scan(&email)
+
 		if err == nil {
 			http.Error(w, "email already exists", http.StatusConflict)
 			return
@@ -58,6 +59,7 @@ func registerHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 		}
 
 		var id string
+
 		err = conn.QueryRow(context.Background(), "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", body.Email, hashedPassowrd).Scan(&id)
 
 		if err != nil {
@@ -285,6 +287,14 @@ func aiQueryHandler() http.HandlerFunc {
 	}
 }
 
+type Palette struct {
+	ID string `json:"id"`
+	Name string `json:"name"`
+	Prompt string `json:"prompt"`
+	Palette []interface{} `json:"palette"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -306,14 +316,18 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 				return
 			}
 
-			_, err = conn.Exec(context.Background(), "INSERT INTO palettes (user_id, name, prompt, palette) VALUES ($1, $2, $3, $4)", userId, body.Name, body.Prompt, body.Palette)
+			var palette Palette
+
+			err = conn.QueryRow(context.Background(), "INSERT INTO palettes (user_id, name, prompt, palette) VALUES ($1, $2, $3, $4) RETURNING id, name, prompt, palette, created_at", userId, body.Name, body.Prompt, body.Palette).Scan(&palette.ID, &palette.Name, &palette.Prompt, &palette.Palette, &palette.CreatedAt)
 
 			if err != nil {
 				http.Error(w, "failed to save palette", http.StatusInternalServerError)
 				return
 			}
 
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(palette)
 		} else if r.Method == http.MethodGet {
 			userId, err := extractUserID(r, jwtSecret)
 
@@ -339,7 +353,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 				CreatedAt time.Time `json:"created_at"`
 			}
 
-			var palettes []Palette
+			palettes := []Palette{}
 
 			for rows.Next() {
 				var p Palette
