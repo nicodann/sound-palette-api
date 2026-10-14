@@ -336,7 +336,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 				return
 			}
 
-			rows, err := conn.Query(context.Background(), "SELECT id, name, prompt, palette, created_at FROM palettes WHERE user_id = $1", userId)
+			rows, err := conn.Query(context.Background(), "SELECT id, name, prompt, palette, created_at FROM palettes WHERE user_id = $1 ORDER BY created_at DESC", userId)
 
 			if err != nil {
 				http.Error(w, "failed to fetch palettes", http.StatusInternalServerError)
@@ -344,14 +344,6 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 			}
 
 			defer rows.Close()
-
-			type Palette struct {
-				ID string `json:"id"`
-				Name string `json:"name"`
-				Prompt string `json:"prompt"`
-				Palette []interface{} `json:"palette"`
-				CreatedAt time.Time `json:"created_at"`
-			}
 
 			palettes := []Palette{}
 
@@ -363,6 +355,11 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 					return
 				}
 				palettes = append(palettes, p)
+			}
+
+			if err := rows.Err(); err != nil {
+				http.Error(w, "failed to read palettes", http.StatusInternalServerError)
+				return
 			}
 
 			w.Header().Set("Content-Type", "application/json")
