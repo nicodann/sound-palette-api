@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -388,14 +389,20 @@ func deletePaletteHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 
 		id := strings.TrimPrefix(r.URL.Path, "/palettes/")
 
-		_, err = conn.Exec(context.Background(), "DELETE FROM palettes WHERE user_id = $1 AND id = $2", userId, id)
+		result, err := conn.Exec(context.Background(), "DELETE FROM palettes WHERE user_id = $1 AND id = $2", userId, id)
 
 		if err != nil {
+			log.Printf("delete palette %s for use %s: %v", id, userId, err)
 			http.Error(w, "failed to delete palette", http.StatusInternalServerError)
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		if result.RowsAffected() == 0 {
+			http.Error(w, "palette not found", http.StatusNotFound)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 
 
 	}
