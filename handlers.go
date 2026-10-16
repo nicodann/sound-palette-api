@@ -17,7 +17,7 @@ import (
 )
 
 
-func registerHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func registerHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
@@ -45,7 +45,7 @@ func registerHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		}
 
 		var email string
-		err := conn.QueryRow(context.Background(), "SELECT email FROM users WHERE email=$1", body.Email).Scan(&email)
+		err := db.QueryRow(context.Background(), "SELECT email FROM users WHERE email=$1", body.Email).Scan(&email)
 
 		if err == nil {
 			http.Error(w, "email already exists", http.StatusConflict)
@@ -61,7 +61,7 @@ func registerHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 		var id string
 
-		err = conn.QueryRow(context.Background(), "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", body.Email, hashedPassowrd).Scan(&id)
+		err = db.QueryRow(context.Background(), "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", body.Email, hashedPassowrd).Scan(&id)
 
 		if err != nil {
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
@@ -100,7 +100,7 @@ func registerHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 } 
 
-func loginHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func loginHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
@@ -124,7 +124,7 @@ func loginHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	
 		var id string
 		var passwordDb string
-		err := conn.QueryRow(context.Background(), "select id, password from users where email=$1", body.Email).Scan(&id, &passwordDb)
+		err := db.QueryRow(context.Background(), "select id, password from users where email=$1", body.Email).Scan(&id, &passwordDb)
 		if err != nil {
 			http.Error(w, "Email not found", http.StatusUnauthorized)
 			return
@@ -166,7 +166,7 @@ func loginHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	}
 }
 
-func meHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func meHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			userId, err := extractUserID(r, jwtSecret)
@@ -177,7 +177,7 @@ func meHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			}
 
 			var email string
-			err = conn.QueryRow(context.Background(), "SELECT email FROM users WHERE id = $1", userId).Scan(&email)
+			err = db.QueryRow(context.Background(), "SELECT email FROM users WHERE id = $1", userId).Scan(&email)
 
 			if err != nil {
 				http.Error(w, "failed to Authenicate", http.StatusInternalServerError)
@@ -296,7 +296,7 @@ type Palette struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func palettesHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func palettesHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			var body struct {
@@ -319,7 +319,7 @@ func palettesHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 			var palette Palette
 
-			err = conn.QueryRow(context.Background(), "INSERT INTO palettes (user_id, name, prompt, palette) VALUES ($1, $2, $3, $4) RETURNING id, name, prompt, palette, created_at", userId, body.Name, body.Prompt, body.Palette).Scan(&palette.ID, &palette.Name, &palette.Prompt, &palette.Palette, &palette.CreatedAt)
+			err = db.QueryRow(context.Background(), "INSERT INTO palettes (user_id, name, prompt, palette) VALUES ($1, $2, $3, $4) RETURNING id, name, prompt, palette, created_at", userId, body.Name, body.Prompt, body.Palette).Scan(&palette.ID, &palette.Name, &palette.Prompt, &palette.Palette, &palette.CreatedAt)
 
 			if err != nil {
 				http.Error(w, "failed to save palette", http.StatusInternalServerError)
@@ -337,7 +337,7 @@ func palettesHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 				return
 			}
 
-			rows, err := conn.Query(context.Background(), "SELECT id, name, prompt, palette, created_at FROM palettes WHERE user_id = $1 ORDER BY created_at DESC", userId)
+			rows, err := db.Query(context.Background(), "SELECT id, name, prompt, palette, created_at FROM palettes WHERE user_id = $1 ORDER BY created_at DESC", userId)
 
 			if err != nil {
 				http.Error(w, "failed to fetch palettes", http.StatusInternalServerError)
@@ -372,7 +372,7 @@ func palettesHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	}
 }
 
-func deletePaletteHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func deletePaletteHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r * http.Request) {
 		if r.Method != http.MethodDelete {
@@ -389,7 +389,7 @@ func deletePaletteHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc
 
 		id := strings.TrimPrefix(r.URL.Path, "/palettes/")
 
-		result, err := conn.Exec(context.Background(), "DELETE FROM palettes WHERE user_id = $1 AND id = $2", userId, id)
+		result, err := db.Exec(context.Background(), "DELETE FROM palettes WHERE user_id = $1 AND id = $2", userId, id)
 
 		if err != nil {
 			log.Printf("delete palette %s for use %s: %v", id, userId, err)
