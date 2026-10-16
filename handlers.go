@@ -12,12 +12,12 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
 
-func registerHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+func registerHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
@@ -100,7 +100,7 @@ func registerHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 
 } 
 
-func loginHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+func loginHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
@@ -166,7 +166,7 @@ func loginHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 	}
 }
 
-func meHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+func meHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			userId, err := extractUserID(r, jwtSecret)
@@ -296,7 +296,7 @@ type Palette struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+func palettesHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			var body struct {
@@ -372,7 +372,7 @@ func palettesHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
 	}
 }
 
-func deletePaletteHandler(conn *pgx.Conn, jwtSecret string) http.HandlerFunc {
+func deletePaletteHandler(conn *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r * http.Request) {
 		if r.Method != http.MethodDelete {

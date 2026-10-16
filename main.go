@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -17,12 +17,12 @@ func main() {
 	
 	// PGX
 
-	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
-	defer conn.Close(context.Background())
+	defer pool.Close()
 
 	// END PGX
 
@@ -51,19 +51,17 @@ func main() {
 
 	http.HandleFunc("/ai-query", corsMiddleware(aiQueryHandler()))
 
-	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(conn, jwtSecret)))
+	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(pool, jwtSecret)))
 
-	http.HandleFunc("/auth/login", corsMiddleware(loginHandler(conn, jwtSecret)))
+	http.HandleFunc("/auth/login", corsMiddleware(loginHandler(pool, jwtSecret)))
 
-	http.HandleFunc("/auth/me", corsMiddleware(meHandler(conn, jwtSecret)))
+	http.HandleFunc("/auth/me", corsMiddleware(meHandler(pool, jwtSecret)))
 
 	http.HandleFunc("/auth/logout", corsMiddleware(logoutHandler()))
 
-	http.HandleFunc("/palettes", corsMiddleware(palettesHandler(conn, jwtSecret)))
+	http.HandleFunc("/palettes", corsMiddleware(palettesHandler(pool, jwtSecret)))
 
-	// http.HandleFunc("/palettes", corsMiddleware(getPalettesHandler(conn, jwtSecret)))
-
-	http.HandleFunc("/palettes/", corsMiddleware(deletePaletteHandler(conn, jwtSecret)))
+	http.HandleFunc("/palettes/", corsMiddleware(deletePaletteHandler(pool, jwtSecret)))
 
 	fmt.Println("Server starting on :8080...")
 
