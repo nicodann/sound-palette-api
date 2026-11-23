@@ -242,6 +242,11 @@ func aiQueryHandler(jwtSecret string) http.HandlerFunc {
 			http.Error(w, "Missing input", http.StatusBadRequest)
 			return
 		}
+
+		if len([]rune(body.Input)) > 500 {
+			http.Error(w, "Input must be 500 characters or fewer", http.StatusBadRequest)
+			return
+		}
 	
 		// MOCK
 	

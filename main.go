@@ -45,11 +45,13 @@ func main() {
 		}
 	}
 
+	aiLimiter := newAIRateLimiter()
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, you!")
 	})
 
-	http.HandleFunc("/ai-query", corsMiddleware(aiQueryHandler(jwtSecret)))
+	http.HandleFunc("/ai-query", corsMiddleware(aiLimiter.middleware(aiQueryHandler(jwtSecret))))
 
 	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(pool, jwtSecret)))
 
