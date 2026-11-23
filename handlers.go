@@ -213,13 +213,22 @@ func logoutHandler() http.HandlerFunc {
 	}
 }
 
-func aiQueryHandler() http.HandlerFunc {
+func aiQueryHandler(jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 			return
 		}
-	
+
+		// Don't require login b/c demo. users can try before loggin in.
+
+		// _, err := extractUserID(r, jwtSecret)
+		
+		// if err != nil {
+		// 		http.Error(w, "login required", http.StatusUnauthorized)
+		// 		return
+		// 	}
+
 		var body struct {
 			Input string `json:"input"`
 		}

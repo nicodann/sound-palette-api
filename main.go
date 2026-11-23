@@ -49,7 +49,7 @@ func main() {
 		fmt.Fprintf(w, "Hello, you!")
 	})
 
-	http.HandleFunc("/ai-query", corsMiddleware(aiQueryHandler()))
+	http.HandleFunc("/ai-query", corsMiddleware(aiQueryHandler(jwtSecret)))
 
 	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(pool, jwtSecret)))
 
