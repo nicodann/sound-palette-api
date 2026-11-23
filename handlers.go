@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
@@ -262,7 +263,7 @@ func aiQueryHandler(jwtSecret string) http.HandlerFunc {
 	
 		// AI
 	
-		client := anthropic.NewClient() // sdk picks up ANTHROPIC_API_KEY variable automatically from env
+		client := anthropic.NewClient(option.WithAPIKey((os.Getenv("ANTHROPIC_API_KEY")))) // without this option sdk picks up ANTHROPIC_API_KEY variable automatically anyway from env
 	
 		prompt := `Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Also one colour, in hexcode format, that corresponds to each word. Return ONLY a valid JSON Array, no other text, no markdown. format: [{"adjective": "word", "colour": "#hexcode"}]. For the colours avoid bold primaries unless explicity stated by the user.`
 	
