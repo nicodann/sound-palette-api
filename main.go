@@ -74,6 +74,13 @@ func main() {
 
 	aiLimiter := newAIRateLimiter()
 
+	limitBody := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
+			next(w,r)
+		}
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + port,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -86,17 +93,17 @@ func main() {
 		fmt.Fprintf(w, "Hello, you!")
 	})
 
-	http.HandleFunc("/ai-query", corsMiddleware(aiLimiter.middleware(aiQueryHandler(jwtSecret, anthropicClient))))
+	http.HandleFunc("/ai-query", corsMiddleware(limitBody(aiLimiter.middleware(aiQueryHandler(jwtSecret, anthropicClient)))))
 
-	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(pool, jwtSecret, secureCookies)))
+	http.HandleFunc("/auth/register", corsMiddleware(limitBody(registerHandler(pool, jwtSecret, secureCookies))))
 
-	http.HandleFunc("/auth/login", corsMiddleware(loginHandler(pool, jwtSecret, secureCookies)))
+	http.HandleFunc("/auth/login", corsMiddleware(limitBody(loginHandler(pool, jwtSecret, secureCookies))))
 
 	http.HandleFunc("/auth/me", corsMiddleware(meHandler(pool, jwtSecret)))
 
 	http.HandleFunc("/auth/logout", corsMiddleware(logoutHandler(secureCookies)))
 
-	http.HandleFunc("/palettes", corsMiddleware(palettesHandler(pool, jwtSecret)))
+	http.HandleFunc("/palettes", corsMiddleware(limitBody(palettesHandler(pool, jwtSecret))))
 
 	http.HandleFunc("/palettes/", corsMiddleware(deletePaletteHandler(pool, jwtSecret)))
 
