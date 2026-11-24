@@ -67,7 +67,46 @@ func readCredentials(w http.ResponseWriter, r *http.Request) (credentials, bool)
 	return body, true
 }
 
-func registerHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func setAuthCookie(w http.ResponseWriter, userID, jwtSecret string, secureCookies bool) error {
+	claims := Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	ss, err := token.SignedString([]byte(jwtSecret))
+
+	if err != nil {
+		return err
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    ss,
+		HttpOnly: true,
+		Secure:   secureCookies,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+		MaxAge:   24 * 60 * 60,
+	})
+
+	return nil
+}
+
+func clearAuthCookie(w http.ResponseWriter, secureCookies bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+}
+
+func registerHandler(db *pgxpool.Pool, jwtSecret string, secureCookies bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, ok := readCredentials(w, r)
 
@@ -103,36 +142,20 @@ func registerHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
-		claims := Claims{
-			UserID: id,
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			},
-		}
-
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		ss, err := token.SignedString([]byte(jwtSecret))
+		err = setAuthCookie(w, id, jwtSecret, secureCookies)
 
 		if err != nil {
-			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			http.Error(w, "Failed to create session", http.StatusInternalServerError)
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "token",
-			Value:    ss,
-			HttpOnly: true,
-			Path:     "/",
-		})
 
 		json.NewEncoder(w).Encode(map[string]string{"id": id, "email": body.Email})
 
 	}
 }
 
-func loginHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func loginHandler(db *pgxpool.Pool, jwtSecret string, secureCookies bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, ok := readCredentials(w, r)
 
@@ -155,29 +178,13 @@ func loginHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
-		claims := Claims{
-			UserID: id,
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			},
-		}
-
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		ss, err := token.SignedString([]byte(jwtSecret))
+		err = setAuthCookie(w, id, jwtSecret, secureCookies)
 
 		if err != nil {
-			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
-			return
+			http.Error(w, "Failed to Login", http.StatusInternalServerError)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "token",
-			Value:    ss,
-			HttpOnly: true,
-			Path:     "/",
-		})
 
 		json.NewEncoder(w).Encode(map[string]string{"id": id, "email": body.Email})
 	}
@@ -210,17 +217,11 @@ func meHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	}
 }
 
-func logoutHandler() http.HandlerFunc {
+func logoutHandler(secureCookies bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 
-			http.SetCookie(w, &http.Cookie{
-				Name:     "token",
-				Value:    "",
-				HttpOnly: true,
-				Path:     "/",
-				Expires:  time.Unix(0, 0),
-			})
+			clearAuthCookie(w, secureCookies)
 
 			w.WriteHeader(http.StatusNoContent)
 

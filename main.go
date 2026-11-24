@@ -38,6 +38,8 @@ func main() {
 
 	anthropicClient := anthropic.NewClient(option.WithAPIKey(anthropicKey))
 
+	secureCookies := os.Getenv("COOKIE_SECURE") == "true"
+
 	// PGX
 
 	pool, err := pgxpool.New(context.Background(), dbURL)
@@ -71,13 +73,13 @@ func main() {
 
 	http.HandleFunc("/ai-query", corsMiddleware(aiLimiter.middleware(aiQueryHandler(jwtSecret, anthropicClient))))
 
-	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(pool, jwtSecret)))
+	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(pool, jwtSecret, secureCookies)))
 
-	http.HandleFunc("/auth/login", corsMiddleware(loginHandler(pool, jwtSecret)))
+	http.HandleFunc("/auth/login", corsMiddleware(loginHandler(pool, jwtSecret, secureCookies)))
 
 	http.HandleFunc("/auth/me", corsMiddleware(meHandler(pool, jwtSecret)))
 
-	http.HandleFunc("/auth/logout", corsMiddleware(logoutHandler()))
+	http.HandleFunc("/auth/logout", corsMiddleware(logoutHandler(secureCookies)))
 
 	http.HandleFunc("/palettes", corsMiddleware(palettesHandler(pool, jwtSecret)))
 
