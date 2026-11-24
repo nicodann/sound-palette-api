@@ -11,14 +11,13 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
 
-func registerHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
+func registerHandler(db *pgxpool.Pool, jwtSecret string ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
@@ -214,14 +213,14 @@ func logoutHandler() http.HandlerFunc {
 	}
 }
 
-func aiQueryHandler(jwtSecret string) http.HandlerFunc {
+func aiQueryHandler(jwtSecret string, anthropicClient anthropic.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Don't require login b/c demo. users can try before loggin in.
+		// Don't require login b/c demo. users can try before logging in.
 
 		// _, err := extractUserID(r, jwtSecret)
 		
@@ -263,11 +262,9 @@ func aiQueryHandler(jwtSecret string) http.HandlerFunc {
 	
 		// AI
 	
-		client := anthropic.NewClient(option.WithAPIKey((os.Getenv("ANTHROPIC_API_KEY")))) // without this option sdk picks up ANTHROPIC_API_KEY variable automatically anyway from env
-	
 		prompt := `Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Also one colour, in hexcode format, that corresponds to each word. Return ONLY a valid JSON Array, no other text, no markdown. format: [{"adjective": "word", "colour": "#hexcode"}]. For the colours avoid bold primaries unless explicity stated by the user.`
 	
-		message, err := client.Messages.New(context.TODO(),	anthropic.MessageNewParams{
+		message, err := anthropicClient.Messages.New(context.TODO(),	anthropic.MessageNewParams{
 				Model: anthropic.ModelClaudeHaiku4_5,
 				MaxTokens: 300,
 				Messages: []anthropic.MessageParam{

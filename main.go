@@ -7,17 +7,40 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	godotenv.Load()
+
 	jwtSecret := os.Getenv("JWT_SECRET")
+	if len(jwtSecret) < 32 {
+		log.Fatal("JWT_SECRET must be set and at least 32 chars")
+	}
+
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL must be set")
+	}
+
+	origin := os.Getenv("ALLOWED_ORIGIN")
+	if origin == "" {
+		log.Fatal("ALLOWED_ORIGIN must be set")
+	}
+
+	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
+	if anthropicKey == "" && os.Getenv("MOCK_AI") != "true" {
+		log.Fatal("ANTHROPIC_API_KEY must be set")
+	}
+
+	anthropicClient := anthropic.NewClient(option.WithAPIKey(anthropicKey)) 
 	
 	// PGX
 
-	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+	pool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
@@ -25,11 +48,6 @@ func main() {
 	defer pool.Close()
 
 	// END PGX
-
-	origin := os.Getenv("ALLOWED_ORIGIN")
-	if origin == "" {
-		origin = "*"
-	}
 
 	corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +69,7 @@ func main() {
 		fmt.Fprintf(w, "Hello, you!")
 	})
 
-	http.HandleFunc("/ai-query", corsMiddleware(aiLimiter.middleware(aiQueryHandler(jwtSecret))))
+	http.HandleFunc("/ai-query", corsMiddleware(aiLimiter.middleware(aiQueryHandler(jwtSecret, anthropicClient))))
 
 	http.HandleFunc("/auth/register", corsMiddleware(registerHandler(pool, jwtSecret)))
 
