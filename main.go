@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -15,6 +16,12 @@ import (
 
 func main() {
 	godotenv.Load()
+
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "8080"
+	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if len(jwtSecret) < 32 {
@@ -67,6 +74,14 @@ func main() {
 
 	aiLimiter := newAIRateLimiter()
 
+	srv := &http.Server{
+		Addr:              ":" + port,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, you!")
 	})
@@ -85,7 +100,7 @@ func main() {
 
 	http.HandleFunc("/palettes/", corsMiddleware(deletePaletteHandler(pool, jwtSecret)))
 
-	fmt.Println("Server starting on :8080...")
+	fmt.Println("Server starting on :" + port + "...")
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(srv.ListenAndServe())
 }

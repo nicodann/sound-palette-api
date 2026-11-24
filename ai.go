@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -62,7 +61,7 @@ func aiQueryHandler(jwtSecret string, anthropicClient anthropic.Client) http.Han
 
 		prompt := `Convert the following phrase into 5 words that capture it's rhythm, tempo and energy. Also one colour, in hexcode format, that corresponds to each word. Return ONLY a valid JSON Array, no other text, no markdown. format: [{"adjective": "word", "colour": "#hexcode"}]. For the colours avoid bold primaries unless explicity stated by the user.`
 
-		message, err := anthropicClient.Messages.New(context.TODO(), anthropic.MessageNewParams{
+		message, err := anthropicClient.Messages.New(r.Context(), anthropic.MessageNewParams{
 			Model:     anthropic.ModelClaudeHaiku4_5,
 			MaxTokens: 300,
 			Messages: []anthropic.MessageParam{

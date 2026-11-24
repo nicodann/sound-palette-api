@@ -25,13 +25,13 @@ func extractUserID(r *http.Request, secret string) (string, error) {
 	tokenString := cookie.Value
 
 	token, err := jwt.ParseWithClaims(
-		tokenString, 
-		&Claims{}, 
+		tokenString,
+		&Claims{},
 		func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
-	},
-	jwt.WithValidMethods([]string{"HS256"}),
-)
+			return []byte(secret), nil
+		},
+		jwt.WithValidMethods([]string{"HS256"}),
+	)
 
 	if err != nil {
 		return "", err
