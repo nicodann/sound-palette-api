@@ -12,20 +12,20 @@ import (
 )
 
 type Palette struct {
-	ID string `json:"id"`
-	Name string `json:"name"`
-	Prompt string `json:"prompt"`
-	Palette []interface{} `json:"palette"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Prompt    string        `json:"prompt"`
+	Palette   []interface{} `json:"palette"`
+	CreatedAt time.Time     `json:"created_at"`
 }
 
 func palettesHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			var body struct {
-				Name	string	`json:"name"`
+				Name    string        `json:"name"`
 				Palette []interface{} `json:"palette"`
-				Prompt string `json:"prompt"`
+				Prompt  string        `json:"prompt"`
 			}
 
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -97,10 +97,10 @@ func palettesHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 func deletePaletteHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
-	return func(w http.ResponseWriter, r * http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
-		http.Error(w, "DELETE required", http.StatusMethodNotAllowed)
-		return
+			http.Error(w, "DELETE required", http.StatusMethodNotAllowed)
+			return
 		}
 
 		userId, err := extractUserID(r, jwtSecret)
@@ -126,7 +126,6 @@ func deletePaletteHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-
 
 	}
 }

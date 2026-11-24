@@ -13,8 +13,8 @@ import (
 )
 
 type Claims struct {
-    UserID string `json:"user_id"`
-    jwt.RegisteredClaims
+	UserID string `json:"user_id"`
+	jwt.RegisteredClaims
 }
 
 func extractUserID(r *http.Request, secret string) (string, error) {
@@ -39,28 +39,41 @@ func extractUserID(r *http.Request, secret string) (string, error) {
 	return claims.UserID, nil
 }
 
-func registerHandler(db *pgxpool.Pool, jwtSecret string ) http.HandlerFunc {
+type credentials struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func readCredentials(w http.ResponseWriter, r *http.Request) (credentials, bool) {
+	var body credentials
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return body, false
+	}
+
+	// Decodes body insto body variable and checks for error
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return body, false
+	}
+
+	if body.Email == "" || body.Password == "" {
+		http.Error(w, "Missing input", http.StatusBadRequest)
+		return body, false
+	}
+
+	return body, true
+}
+
+func registerHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		body, ok := readCredentials(w, r)
+
+		if !ok {
 			return
 		}
-
-		var body struct {
-			Email string `json:"email"`
-			Password string `json:"password"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "invalid JSON body", http.StatusBadRequest)
-			return
-		}
-
-		if body.Email == "" || body.Password == "" {
-			http.Error(w, "Missing input", http.StatusBadRequest)
-			return
-		}
-
 		if len(body.Password) < 8 {
 			http.Error(w, "Password must be at least 8 characters", http.StatusBadRequest)
 			return
@@ -73,8 +86,8 @@ func registerHandler(db *pgxpool.Pool, jwtSecret string ) http.HandlerFunc {
 			http.Error(w, "email already exists", http.StatusConflict)
 			return
 		}
-		
-		hashedPassowrd, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 
 		if err != nil {
 			http.Error(w, "Password failed to hash", http.StatusInternalServerError)
@@ -83,7 +96,7 @@ func registerHandler(db *pgxpool.Pool, jwtSecret string ) http.HandlerFunc {
 
 		var id string
 
-		err = db.QueryRow(context.Background(), "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", body.Email, hashedPassowrd).Scan(&id)
+		err = db.QueryRow(context.Background(), "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", body.Email, hashedPassword).Scan(&id)
 
 		if err != nil {
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
@@ -95,7 +108,6 @@ func registerHandler(db *pgxpool.Pool, jwtSecret string ) http.HandlerFunc {
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			},
-
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -106,44 +118,28 @@ func registerHandler(db *pgxpool.Pool, jwtSecret string ) http.HandlerFunc {
 			return
 		}
 
-
 		w.Header().Set("Content-Type", "application/json")
 
 		http.SetCookie(w, &http.Cookie{
-			Name: "token",
-			Value: ss,
+			Name:     "token",
+			Value:    ss,
 			HttpOnly: true,
-			Path: "/",
+			Path:     "/",
 		})
 
 		json.NewEncoder(w).Encode(map[string]string{"id": id, "email": body.Email})
-		
-	}
 
-} 
+	}
+}
 
 func loginHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		body, ok := readCredentials(w, r)
+
+		if !ok {
 			return
 		}
-	
-		var body struct {
-			Email string `json:"email"`
-			Password string `json:"password"`
-		}
-	
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "invalid JSON body", http.StatusBadRequest)
-			return
-		}
-	
-		if body.Email == "" || body.Password == "" {
-			http.Error(w, "Missing input", http.StatusBadRequest)
-			return
-		}
-	
+
 		var id string
 		var passwordDb string
 		err := db.QueryRow(context.Background(), "select id, password from users where email=$1", body.Email).Scan(&id, &passwordDb)
@@ -151,40 +147,39 @@ func loginHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			http.Error(w, "Email not found", http.StatusUnauthorized)
 			return
 		}
-	
-		err = bcrypt.CompareHashAndPassword( []byte(passwordDb), []byte(body.Password))
-	
+
+		err = bcrypt.CompareHashAndPassword([]byte(passwordDb), []byte(body.Password))
+
 		if err != nil {
 			http.Error(w, "Password is incorrect", http.StatusUnauthorized)
 			return
 		}
-	
+
 		claims := Claims{
 			UserID: id,
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			},
-	
 		}
-	
+
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		ss, err := token.SignedString([]byte(jwtSecret))
-	
+
 		if err != nil {
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		http.SetCookie(w, &http.Cookie{
-			Name: "token",
-			Value: ss,
+			Name:     "token",
+			Value:    ss,
 			HttpOnly: true,
-			Path: "/",
+			Path:     "/",
 		})
 
-		json.NewEncoder(w).Encode(map[string]string{"id": id, "email": body.Email})		
+		json.NewEncoder(w).Encode(map[string]string{"id": id, "email": body.Email})
 	}
 }
 
@@ -218,16 +213,16 @@ func meHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 func logoutHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-		
-		http.SetCookie(w, &http.Cookie{
-			Name: "token",
-			Value: "",
-			HttpOnly: true,
-			Path: "/",
-			Expires: time.Unix(0, 0),
-		})
 
-		w.WriteHeader(http.StatusNoContent)
+			http.SetCookie(w, &http.Cookie{
+				Name:     "token",
+				Value:    "",
+				HttpOnly: true,
+				Path:     "/",
+				Expires:  time.Unix(0, 0),
+			})
+
+			w.WriteHeader(http.StatusNoContent)
 
 		} else {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)

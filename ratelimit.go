@@ -12,15 +12,15 @@ import (
 )
 
 type visitor struct {
-	minute		*rate.Limiter
-	day				*rate.Limiter
-	lastSeen	time.Time
+	minute   *rate.Limiter
+	day      *rate.Limiter
+	lastSeen time.Time
 }
 
 type aiRateLimiter struct {
-	mu				sync.Mutex
-	visitors	map[string]*visitor
-	global 		*rate.Limiter
+	mu       sync.Mutex
+	visitors map[string]*visitor
+	global   *rate.Limiter
 }
 
 func newAIRateLimiter() *aiRateLimiter {
@@ -41,7 +41,7 @@ func (limiter *aiRateLimiter) getVisitor(ip string) *visitor {
 	if !ok {
 		v = &visitor{
 			minute: rate.NewLimiter(rate.Every(time.Minute/5), 5),
-			day:		rate.NewLimiter(rate.Every(24*time.Hour/30), 30),
+			day:    rate.NewLimiter(rate.Every(24*time.Hour/30), 30),
 		}
 		limiter.visitors[ip] = v
 	}
@@ -65,7 +65,7 @@ func (limiter *aiRateLimiter) cleanup() {
 }
 
 func (limiter *aiRateLimiter) middleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r * http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		v := limiter.getVisitor(clientIP(r))
 
 		if !v.minute.Allow() || !v.day.Allow() {
@@ -86,7 +86,7 @@ func clientIP(r *http.Request) string {
 	if os.Getenv("TRUST_PROXY") == "true" {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			parts := strings.Split(xff, ",")
-			return strings.TrimSpace(parts[len(parts) -1])
+			return strings.TrimSpace(parts[len(parts)-1])
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

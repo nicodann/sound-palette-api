@@ -36,8 +36,8 @@ func main() {
 		log.Fatal("ANTHROPIC_API_KEY must be set")
 	}
 
-	anthropicClient := anthropic.NewClient(option.WithAPIKey(anthropicKey)) 
-	
+	anthropicClient := anthropic.NewClient(option.WithAPIKey(anthropicKey))
+
 	// PGX
 
 	pool, err := pgxpool.New(context.Background(), dbURL)
@@ -53,7 +53,7 @@ func main() {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, DELETE, OPTIONS")
-      w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
