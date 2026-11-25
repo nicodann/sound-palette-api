@@ -77,7 +77,7 @@ func main() {
 	limitBody := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
-			next(w,r)
+			next(w, r)
 		}
 	}
 

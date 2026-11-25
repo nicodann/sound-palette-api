@@ -3,29 +3,54 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type paletteColour struct {
+	Adjective string `json:"adjective"`
+	Colour    string `json:"colour"`
+}
+
 type Palette struct {
-	ID        string        `json:"id"`
-	Name      string        `json:"name"`
-	Prompt    string        `json:"prompt"`
-	Palette   []interface{} `json:"palette"`
-	CreatedAt time.Time     `json:"created_at"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Prompt    string          `json:"prompt"`
+	Palette   []paletteColour `json:"palette"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+var hexColour = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+func validatePalette(p []paletteColour) error {
+	if len(p) != 5 {
+		return errors.New("palette must contain 5 colours")
+	}
+	for _, c := range p {
+		if c.Adjective == "" || utf8.RuneCountInString(c.Adjective) > 30 {
+			return errors.New("each adjective must be 1–30 characters")
+		}
+		if !hexColour.MatchString(c.Colour) {
+			return errors.New("each colour must be a hex code like #A8D8EA")
+		}
+	}
+	return nil
 }
 
 func palettesHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			var body struct {
-				Name    string        `json:"name"`
-				Palette []interface{} `json:"palette"`
-				Prompt  string        `json:"prompt"`
+				Name    string          `json:"name"`
+				Palette []paletteColour `json:"palette"`
+				Prompt  string          `json:"prompt"`
 			}
 
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -37,6 +62,20 @@ func palettesHandler(db *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 
 			if err != nil {
 				http.Error(w, "error parsing user ID", http.StatusUnauthorized)
+				return
+			}
+
+			if utf8.RuneCountInString(body.Name) > 50 {
+				http.Error(w, "Name must be 50 chars or fewer", http.StatusBadRequest)
+				return
+			}
+			if utf8.RuneCountInString(body.Prompt) > 500 {
+				http.Error(w, "Prompt must be 500 chars or fewer", http.StatusBadRequest)
+				return
+			}
+
+			if err := validatePalette(body.Palette); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -85,10 +86,16 @@ func aiQueryHandler(jwtSecret string, anthropicClient anthropic.Client) http.Han
 		text = strings.TrimSuffix(text, "```")
 		text = strings.TrimSpace(text)
 
-		var parsed []interface{}
+		var parsed []paletteColour
 		if err := json.Unmarshal([]byte(text), &parsed); err != nil {
 			fmt.Println("JSON parse failed:", err)
 			http.Error(w, "failed to parseAI response", http.StatusInternalServerError)
+			return
+		}
+
+		if err := validatePalette(parsed); err != nil {
+			log.Printf("AI returned an invalid palette: %v; raw: %s", err, text)
+			http.Error(w, "Couldn't generate a valid palette, please try again", http.StatusBadGateway)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

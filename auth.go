@@ -3,11 +3,15 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -63,6 +67,8 @@ func readCredentials(w http.ResponseWriter, r *http.Request) (credentials, bool)
 		http.Error(w, "invalid JSON body", http.StatusBadRequest)
 		return body, false
 	}
+
+	body.Email = strings.ToLower(strings.TrimSpace(body.Email))
 
 	if body.Email == "" || body.Password == "" {
 		http.Error(w, "Missing input", http.StatusBadRequest)
@@ -170,16 +176,21 @@ func loginHandler(db *pgxpool.Pool, jwtSecret string, secureCookies bool) http.H
 
 		var id string
 		var passwordDb string
-		err := db.QueryRow(context.Background(), "select id, password from users where email=$1", body.Email).Scan(&id, &passwordDb)
-		if err != nil {
-			http.Error(w, "Email not found", http.StatusUnauthorized)
+		err := db.QueryRow(context.Background(), "SELECT id, password FROM users WHERE email=$1", body.Email).Scan(&id, &passwordDb)
+		if errors.Is(err, pgx.ErrNoRows) { // no such user
+			http.Error(w, "Email not found or password incorrect", http.StatusUnauthorized)
+			return
+		}
+		if err != nil { // database issue
+			log.Printf("login lookup failed: %v", err)
+			http.Error(w, "Something went wrong, please try again", http.StatusInternalServerError)
 			return
 		}
 
 		err = bcrypt.CompareHashAndPassword([]byte(passwordDb), []byte(body.Password))
 
 		if err != nil {
-			http.Error(w, "Password is incorrect", http.StatusUnauthorized)
+			http.Error(w, "Email not found or password incorrect", http.StatusUnauthorized)
 			return
 		}
 
@@ -187,6 +198,7 @@ func loginHandler(db *pgxpool.Pool, jwtSecret string, secureCookies bool) http.H
 
 		if err != nil {
 			http.Error(w, "Failed to Login", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
