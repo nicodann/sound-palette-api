@@ -72,7 +72,8 @@ func main() {
 		}
 	}
 
-	aiLimiter := newAIRateLimiter()
+	aiLimiter := newRateLimiter(5, 30, 150)
+	authLimiter := newRateLimiter(10, 100, 0)
 
 	limitBody := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -95,9 +96,9 @@ func main() {
 
 	http.HandleFunc("/ai-query", corsMiddleware(limitBody(aiLimiter.middleware(aiQueryHandler(jwtSecret, anthropicClient)))))
 
-	http.HandleFunc("/auth/register", corsMiddleware(limitBody(registerHandler(pool, jwtSecret, secureCookies))))
+	http.HandleFunc("/auth/register", corsMiddleware(limitBody(authLimiter.middleware(registerHandler(pool, jwtSecret, secureCookies)))))
 
-	http.HandleFunc("/auth/login", corsMiddleware(limitBody(loginHandler(pool, jwtSecret, secureCookies))))
+	http.HandleFunc("/auth/login", corsMiddleware(limitBody(authLimiter.middleware(loginHandler(pool, jwtSecret, secureCookies)))))
 
 	http.HandleFunc("/auth/me", corsMiddleware(meHandler(pool, jwtSecret)))
 

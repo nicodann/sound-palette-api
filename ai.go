@@ -89,7 +89,7 @@ func aiQueryHandler(jwtSecret string, anthropicClient anthropic.Client) http.Han
 		var parsed []paletteColour
 		if err := json.Unmarshal([]byte(text), &parsed); err != nil {
 			fmt.Println("JSON parse failed:", err)
-			http.Error(w, "failed to parseAI response", http.StatusInternalServerError)
+			http.Error(w, "Couldn't generate a valid palette, please try again", http.StatusBadGateway)
 			return
 		}
 

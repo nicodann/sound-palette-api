@@ -17,31 +17,36 @@ type visitor struct {
 	lastSeen time.Time
 }
 
-type aiRateLimiter struct {
-	mu       sync.Mutex
-	visitors map[string]*visitor
-	global   *rate.Limiter
+type rateLimiter struct {
+	mu        sync.Mutex
+	visitors  map[string]*visitor
+	global    *rate.Limiter
+	perMinute int
+	perDay    int
 }
 
-func newAIRateLimiter() *aiRateLimiter {
-	limiter := &aiRateLimiter{
-		visitors: make(map[string]*visitor),
-		// 150 tokens, refilling one every 24h/150 (~ 9.6min)
-		global: rate.NewLimiter(rate.Every(24*time.Hour/150), 150),
+func newRateLimiter(perMinute, perDay, globalPerDay int) *rateLimiter {
+	limiter := &rateLimiter{
+		visitors:  make(map[string]*visitor),
+		perMinute: perMinute,
+		perDay:    perDay,
+	}
+	if globalPerDay > 0 {
+		limiter.global = rate.NewLimiter(rate.Every(24*time.Hour/time.Duration(globalPerDay)), globalPerDay)
 	}
 	go limiter.cleanup()
 	return limiter
 }
 
-func (limiter *aiRateLimiter) getVisitor(ip string) *visitor {
+func (limiter *rateLimiter) getVisitor(ip string) *visitor {
 	limiter.mu.Lock()
 	defer limiter.mu.Unlock()
 
 	v, ok := limiter.visitors[ip]
 	if !ok {
 		v = &visitor{
-			minute: rate.NewLimiter(rate.Every(time.Minute/5), 5),
-			day:    rate.NewLimiter(rate.Every(24*time.Hour/30), 30),
+			minute: rate.NewLimiter(rate.Every(time.Minute/time.Duration(limiter.perMinute)), limiter.perMinute),
+			day:    rate.NewLimiter(rate.Every(24*time.Hour/time.Duration(limiter.perDay)), limiter.perDay),
 		}
 		limiter.visitors[ip] = v
 	}
@@ -51,7 +56,7 @@ func (limiter *aiRateLimiter) getVisitor(ip string) *visitor {
 
 // Forget IPs idle for a day, so the map doesn't grow forever.
 // After 24h idle their buckets would be full again anyway.
-func (limiter *aiRateLimiter) cleanup() {
+func (limiter *rateLimiter) cleanup() {
 	for {
 		time.Sleep(10 * time.Minute)
 		limiter.mu.Lock()
@@ -64,7 +69,7 @@ func (limiter *aiRateLimiter) cleanup() {
 	}
 }
 
-func (limiter *aiRateLimiter) middleware(next http.HandlerFunc) http.HandlerFunc {
+func (limiter *rateLimiter) middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		v := limiter.getVisitor(clientIP(r))
 
@@ -72,7 +77,7 @@ func (limiter *aiRateLimiter) middleware(next http.HandlerFunc) http.HandlerFunc
 			http.Error(w, "Too many requests, please slow down.", http.StatusTooManyRequests)
 			return
 		}
-		if !limiter.global.Allow() {
+		if limiter.global != nil && !limiter.global.Allow() {
 			http.Error(w, "The demo has reached today's limit. Try again tomorrow.", http.StatusTooManyRequests)
 			return
 		}
