@@ -26,6 +26,8 @@ type rateLimiter struct {
 }
 
 func newRateLimiter(perMinute, perDay, globalPerDay int) *rateLimiter {
+	if perMinute <= 0 || perDay <= 0 { panic("rate limits must be positive") }
+	
 	limiter := &rateLimiter{
 		visitors:  make(map[string]*visitor),
 		perMinute: perMinute,
