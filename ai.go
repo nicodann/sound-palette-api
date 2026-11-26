@@ -50,7 +50,7 @@ func aiQueryHandler(jwtSecret string, anthropicClient anthropic.Client) http.Han
 
 		if os.Getenv("MOCK_AI") == "true" {
 			mock := `[{"adjective":"dreamy","colour":"#A8D8EA"},{"adjective":"soft","colour":"#AA96DA"},{"adjective":"calm","colour":"#FCBAD3"},{"adjective":"gentle","colour":"#FFFFD2"},{"adjective":"slow","colour":"#B5EAD7"}]`
-			var parsed []interface{}
+			var parsed []paletteColour
 			json.Unmarshal([]byte(mock), &parsed)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(parsed)
